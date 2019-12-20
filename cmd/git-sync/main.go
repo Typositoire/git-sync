@@ -540,10 +540,16 @@ func cloneRepo(ctx context.Context, repo, branch, rev string, depth int, gitRoot
 
 // localHashForRev returns the locally known hash for a given rev.
 func localHashForRev(ctx context.Context, rev, gitRoot string) (string, error) {
+	_, err := runCommand(ctx, gitRoot, *flGitCmd, "fetch", "origin")
+	if err != nil {
+		return "", err
+	}
+
 	output, err := runCommand(ctx, gitRoot, *flGitCmd, "rev-parse", rev)
 	if err != nil {
 		return "", err
 	}
+
 	return strings.Trim(string(output), "\n"), nil
 }
 
