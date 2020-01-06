@@ -444,12 +444,16 @@ func addWorktreeAndSwap(ctx context.Context, gitRoot, dest, branch, rev string, 
 
 	// Make a worktree for this exact git hash.
 	worktreePath := path.Join(gitRoot, "rev-"+hash)
-	_, err := runCommand(ctx, gitRoot, *flGitCmd, "worktree", "add", worktreePath, "origin/"+branch)
-	log.V(0).Info("adding worktree", "path", worktreePath, "branch", fmt.Sprintf("origin/%s", branch))
-	if err != nil {
-		return err
-	}
+	_, err := os.Stat(worktreePath)
+	isNotExist := os.IsNotExist(err)
 
+	if rev == "HEAD" || isNotExist {
+		_, err := runCommand(ctx, gitRoot, *flGitCmd, "worktree", "add", worktreePath, "origin/"+branch)
+		log.V(0).Info("adding worktree", "path", worktreePath, "branch", fmt.Sprintf("origin/%s", branch))
+		if err != nil {
+			return err
+		}
+	}
 	// The .git file in the worktree directory holds a reference to
 	// /git/.git/worktrees/<worktree-dir-name>. Replace it with a reference
 	// using relative paths, so that other containers can use a different volume
@@ -495,7 +499,7 @@ func addWorktreeAndSwap(ctx context.Context, gitRoot, dest, branch, rev string, 
 	// Flip the symlink.
 	if oldWorktree, err := updateSymlink(ctx, gitRoot, dest, worktreePath); err != nil {
 		return err
-	} else if oldWorktree != "" {
+	} else if oldWorktree != "" && rev == "HEAD" {
 		// Clean up previous worktree
 		log.V(1).Info("removing old worktree", "path", oldWorktree)
 		if err := os.RemoveAll(oldWorktree); err != nil {
@@ -504,6 +508,17 @@ func addWorktreeAndSwap(ctx context.Context, gitRoot, dest, branch, rev string, 
 		if _, err := runCommand(ctx, gitRoot, *flGitCmd, "worktree", "prune"); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func refreshTag(ctx context.Context, repo, branch, rev string, depth int, gitRoot string) error {
+	args := []string{"pull", "origin", rev}
+	log.V(0).Info("pulling rev from origin", rev, repo, "path", gitRoot)
+	_, err := runCommand(ctx, gitRoot, *flGitCmd, args...)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -607,6 +622,16 @@ func syncRepo(ctx context.Context, repo, branch, rev string, depth int, gitRoot,
 		}
 	case err != nil:
 		return false, "", fmt.Errorf("error checking if repo exists %q: %v", gitRepoPath, err)
+	case rev != "HEAD":
+		// TAG. Just clone it and get the hash.
+		err = refreshTag(ctx, repo, branch, rev, depth, gitRoot)
+		if err != nil {
+			return false, "", err
+		}
+		hash, err = localHashForRev(ctx, rev, gitRoot)
+		if err != nil {
+			return false, "", err
+		}
 	default:
 		// Not the first time. Figure out if the ref has changed.
 		local, remote, err := getRevs(ctx, target, branch, rev)
