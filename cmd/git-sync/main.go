@@ -514,9 +514,16 @@ func addWorktreeAndSwap(ctx context.Context, gitRoot, dest, branch, rev string, 
 }
 
 func refreshTag(ctx context.Context, repo, branch, rev string, depth int, gitRoot string) error {
-	args := []string{"pull", "origin", rev}
-	log.V(0).Info("pulling rev from origin", rev, repo, "path", gitRoot)
+	args := []string{"reset", "--hard", rev}
+	log.V(0).Info("remove local changes ")
 	_, err := runCommand(ctx, gitRoot, *flGitCmd, args...)
+	if err != nil {
+		return err
+	}
+
+	args = []string{"pull", "origin", rev}
+	log.V(0).Info("pulling rev from origin", rev, repo, "path", gitRoot)
+	_, err = runCommand(ctx, gitRoot, *flGitCmd, args...)
 	if err != nil {
 		return err
 	}
