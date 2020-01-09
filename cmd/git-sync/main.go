@@ -513,17 +513,17 @@ func addWorktreeAndSwap(ctx context.Context, gitRoot, dest, branch, rev string, 
 	return nil
 }
 
-func refreshTag(ctx context.Context, repo, branch, rev string, depth int, gitRoot string) error {
+func refreshTag(ctx context.Context, repo, branch, rev string, depth int, dest string) error {
 	args := []string{"reset", "--hard", rev}
 	log.V(0).Info("remove local changes ")
-	_, err := runCommand(ctx, gitRoot, *flGitCmd, args...)
+	_, err := runCommand(ctx, dest, *flGitCmd, args...)
 	if err != nil {
 		return err
 	}
 
 	args = []string{"pull", "origin", rev}
-	log.V(0).Info("pulling rev from origin", rev, repo, "path", gitRoot)
-	_, err = runCommand(ctx, gitRoot, *flGitCmd, args...)
+	log.V(0).Info("pulling rev from origin", rev, repo, "path", dest)
+	_, err = runCommand(ctx, dest, *flGitCmd, args...)
 	if err != nil {
 		return err
 	}
@@ -631,7 +631,7 @@ func syncRepo(ctx context.Context, repo, branch, rev string, depth int, gitRoot,
 		return false, "", fmt.Errorf("error checking if repo exists %q: %v", gitRepoPath, err)
 	case rev != "HEAD":
 		// TAG. Just clone it and get the hash.
-		err = refreshTag(ctx, repo, branch, rev, depth, gitRoot)
+		err = refreshTag(ctx, repo, branch, rev, depth, dest)
 		if err != nil {
 			return false, "", err
 		}
